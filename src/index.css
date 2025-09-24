@@ -5,5 +5,5 @@ body {
 }
 
 .button {
-  @apply h-10 px-2 rounded-lg border-zinc-800 font-medium border cursor-pointer hover:bg-zinc-900 transition-colors;
+  @apply h-10 px-2 rounded-lg border-zinc-800 font-medium border cursor-pointer hover:bg-zinc-900 transition-colors focus:outline-none;
 }
