@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+body {
+  @apply bg-zinc-950 antialiased text-zinc-100;
+}
+
+.button {
+  @apply h-10 px-2 rounded-lg border-zinc-800 font-medium border cursor-pointer hover:bg-zinc-900 transition-colors;
+}
