@@ -6,23 +6,26 @@ import unlock from "../assets/sounds/unlock.mp3";
 import Counter from "../components/ui/counter";
 import generateCode from "../helpers/generateCode";
 
+const INITIAL_PAIRS = { 1: 0, 2: 0, 3: 0 };
+const MAX_PAIR_VALUE = 99;
+const MIN_PAIR_VALUE = 0;
+const FEEDBACK_DURATION = 700;
+
 export default function SafeCode() {
   const [code, setCode] = useState(() => generateCode());
 
   const safeAreaRef = useRef<HTMLDivElement>(null);
-  const hitSound = new Audio(som1);
-  const normalSound = new Audio(som2);
-  const unlockSound = new Audio(unlock);
-  const lockSound = new Audio(lock);
+  const successTimeoutRef = useRef<number>(0);
+  const errorTimeoutRef = useRef<number>(0);
+  const hitSound = useRef(new Audio(som1));
+  const normalSound = useRef(new Audio(som2));
+  const unlockSound = useRef(new Audio(unlock));
+  const lockSound = useRef(new Audio(lock));
 
   const [error, setError] = useState(false);
   const [sucess, setSucess] = useState(false);
   const [selectedPair, setSelectedPair] = useState<number>(1);
-  const [pairs, setPairs] = useState<Record<number, number>>({
-    1: 0,
-    2: 0,
-    3: 0,
-  });
+  const [pairs, setPairs] = useState<Record<number, number>>(INITIAL_PAIRS);
 
   function handleKeyDown(event: KeyboardEvent) {
     if (event.key === "ArrowRight") {
@@ -62,30 +65,37 @@ export default function SafeCode() {
   function incrementPair() {
     setPairs((prev) => ({
       ...prev,
-      [selectedPair]: prev[selectedPair] >= 99 ? 0 : prev[selectedPair] + 1,
+      [selectedPair]:
+        prev[selectedPair] >= MAX_PAIR_VALUE ? MIN_PAIR_VALUE : prev[selectedPair] + 1,
     }));
   }
 
   function decrementPair() {
     setPairs((prev) => ({
       ...prev,
-      [selectedPair]: prev[selectedPair] <= 0 ? 99 : prev[selectedPair] - 1,
+      [selectedPair]:
+        prev[selectedPair] <= MIN_PAIR_VALUE ? MAX_PAIR_VALUE : prev[selectedPair] - 1,
     }));
   }
 
   function handleSendCode() {
-    if (Object.values(pairs).toString() === code.toString()) {
+    const isCodeCorrect = code.every((digit, index) => pairs[index + 1] === digit);
+
+    if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+
+    if (isCodeCorrect) {
       setSucess(true);
-      unlockSound.play();
-      setTimeout(() => {
+      unlockSound.current.play().catch(console.warn);
+      successTimeoutRef.current = setTimeout(() => {
         setSucess(false);
-      }, 700);
+      }, FEEDBACK_DURATION);
     } else {
       setError(true);
-      lockSound.play();
-      setTimeout(() => {
+      lockSound.current.play().catch(console.warn);
+      errorTimeoutRef.current = setTimeout(() => {
         setError(false);
-      }, 700);
+      }, FEEDBACK_DURATION);
     }
   }
 
@@ -99,7 +109,7 @@ export default function SafeCode() {
 
   function handleChangeCode() {
     setCode(generateCode());
-    setPairs({ 1: 0, 2: 0, 3: 0 });
+    setPairs(INITIAL_PAIRS);
     setSelectedPair(1);
   }
 
@@ -134,16 +144,26 @@ export default function SafeCode() {
 
     return () => {
       document.removeEventListener("focusin", handleGlobalFocus);
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
     };
   }, []);
 
   useEffect(() => {
-    if (pairs[selectedPair] == code[selectedPair - 1]) {
-      hitSound.play();
+    const playSound = async (sound: HTMLAudioElement) => {
+      try {
+        await sound.play();
+      } catch (error) {
+        console.warn("Não foi possível reproduzir o áudio:", error);
+      }
+    };
+
+    if (pairs[selectedPair] === code[selectedPair - 1]) {
+      playSound(hitSound.current);
     } else {
-      normalSound.play();
+      playSound(normalSound.current);
     }
-  }, [pairs, selectedPair]);
+  }, [pairs, selectedPair, code]);
 
   return (
     <div className="p-4 border border-zinc-800 rounded-lg  ">
@@ -193,7 +213,7 @@ export default function SafeCode() {
           </button>
 
           <button onClick={handleChangeCode} className="button">
-            trocar código
+            Trocar código
           </button>
         </div>
       </div>
