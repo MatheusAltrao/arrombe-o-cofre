@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import lock from "../assets/sounds/lock.mp3";
 import som1 from "../assets/sounds/som-1.mp3";
 import som2 from "../assets/sounds/som-2.mp3";
@@ -10,6 +10,8 @@ const INITIAL_PAIRS = { 1: 0, 2: 0, 3: 0 };
 const MAX_PAIR_VALUE = 99;
 const MIN_PAIR_VALUE = 0;
 const FEEDBACK_DURATION = 700;
+const MAX_PAIRS = 3;
+const MIN_PAIRS = 1;
 
 export default function SafeCode() {
   const [code, setCode] = useState(() => generateCode());
@@ -27,58 +29,23 @@ export default function SafeCode() {
   const [selectedPair, setSelectedPair] = useState<number>(1);
   const [pairs, setPairs] = useState<Record<number, number>>(INITIAL_PAIRS);
 
-  function handleKeyDown(event: KeyboardEvent) {
-    if (event.key === "ArrowRight") {
-      event.preventDefault();
-      setSelectedPair((prev) => Math.min(prev + 1, 3));
-    }
-
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      setSelectedPair((prev) => Math.max(prev - 1, 1));
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      incrementPair();
-    }
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      decrementPair();
-    }
-
-    if (event.key === "Tab") {
-      event.preventDefault();
-      handleChangeSelectedPair();
-      if (safeAreaRef.current) {
-        safeAreaRef.current.focus();
-      }
-    }
-
-    if (event.key === "Enter") {
-      event.preventDefault();
-      handleSendCode();
-    }
-  }
-
-  function incrementPair() {
+  const incrementPair = useCallback(() => {
     setPairs((prev) => ({
       ...prev,
       [selectedPair]:
         prev[selectedPair] >= MAX_PAIR_VALUE ? MIN_PAIR_VALUE : prev[selectedPair] + 1,
     }));
-  }
+  }, [selectedPair]);
 
-  function decrementPair() {
+  const decrementPair = useCallback(() => {
     setPairs((prev) => ({
       ...prev,
       [selectedPair]:
         prev[selectedPair] <= MIN_PAIR_VALUE ? MAX_PAIR_VALUE : prev[selectedPair] - 1,
     }));
-  }
+  }, [selectedPair]);
 
-  function handleSendCode() {
+  const handleSendCode = useCallback(() => {
     const isCodeCorrect = code.every((digit, index) => pairs[index + 1] === digit);
 
     if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
@@ -97,11 +64,34 @@ export default function SafeCode() {
         setError(false);
       }, FEEDBACK_DURATION);
     }
-  }
+  }, [code, pairs]);
 
-  function handleChangeSelectedPair() {
-    setSelectedPair((prev) => (prev === 3 ? 1 : prev + 1));
-  }
+  const handleChangeSelectedPair = useCallback(() => {
+    setSelectedPair((prev) => (prev === MAX_PAIRS ? MIN_PAIRS : prev + 1));
+  }, []);
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      const keyActions: Record<string, () => void> = {
+        ArrowRight: () => setSelectedPair((prev) => Math.min(prev + 1, MAX_PAIRS)),
+        ArrowLeft: () => setSelectedPair((prev) => Math.max(prev - 1, MIN_PAIRS)),
+        ArrowUp: incrementPair,
+        ArrowDown: decrementPair,
+        Tab: () => {
+          handleChangeSelectedPair();
+          safeAreaRef.current?.focus();
+        },
+        Enter: handleSendCode,
+      };
+
+      const action = keyActions[event.key];
+      if (action) {
+        event.preventDefault();
+        action();
+      }
+    },
+    [incrementPair, decrementPair, handleChangeSelectedPair, handleSendCode]
+  );
 
   function handleRevealCode() {
     setPairs({ 1: code[0], 2: code[1], 3: code[2] });
